@@ -1,0 +1,6 @@
+{
+    "dataset" : "./dataset/train_students.csv",
+    "norm_model" : "Standard",
+    "number_best_features" : 30,
+    "variance_threshold" : 0
+}
