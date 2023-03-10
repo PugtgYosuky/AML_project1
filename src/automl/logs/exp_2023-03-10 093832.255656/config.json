@@ -1,0 +1,1 @@
+{"time_budget": -1, "max_iter": 300, "metric": "f1", "task": "classification", "log_file_name": "logs/exp_2023-03-10 09:38:32.255656/log_estimator.log", "log_type": "all", "hpo_method": "cfo"}

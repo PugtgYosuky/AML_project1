@@ -1,0 +1,1 @@
+{"n_estimators": 635, "num_leaves": 4, "min_child_samples": 4, "learning_rate": 0.03609101623502663, "log_max_bin": 10, "colsample_bytree": 0.7937920973207809, "reg_alpha": 0.008712254633825954, "reg_lambda": 1.0953489781514556, "FLAML_sample_size": 70173}

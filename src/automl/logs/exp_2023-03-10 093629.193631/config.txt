@@ -1,0 +1,9 @@
+settings = {
+    "time_budget": -1 ,  # in seconds
+    "max_iter" : 300,
+    "metric": 'accuracy',
+    "task": 'classification',
+    "log_file_name": "log_estimator.log",
+    'log_type' : 'all',
+    'hpo_method' : 'cfo'
+}
