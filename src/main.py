@@ -87,7 +87,8 @@ if __name__ == '__main__':
             transformers=[
                 ('cat', CustomEncoder(), categorical_columns),
                 ('num', DropUniqueColumns(), numerical_columns)
-            ]
+            ], 
+            remainder='passthrough'
         )),
         ('feature_selection', SelectKBest(k=config.get('number_best_features', X.shape[1]))),
         ('variance_selct', VarianceThreshold(threshold=config.get('variance_threshold', 0))),
