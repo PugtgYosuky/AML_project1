@@ -7,14 +7,25 @@ import os
 import sys
 import datetime
 import json
+import pprint
 
 from utils import *
+
+import warnings
+warnings.filterwarnings("ignore")
 
 from sklearn.model_selection import train_test_split, cross_validate, KFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold, SelectKBest
+
+#models
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
 
 # plot parametars
 plt.rcParams["figure.figsize"] = (20,12)
@@ -23,6 +34,15 @@ plt.style.use('fivethirtyeight')
 plt.rcParams['figure.facecolor'] = 'white'
 plt.rcParams['axes.facecolor'] = 'white'
 plt.rcParams['lines.linewidth'] = 3
+
+# TODO: move the function to utils.py
+def instanciate_model(model_name):
+    if model_name == 'LogisticRegression':
+        model = LogisticRegression()
+
+    elif model_name == 'RandomForestClassifier':
+        model = RandomForestClassifier()
+    return model
 
 # main funtion of python
 if __name__ == '__main__':
@@ -79,10 +99,7 @@ if __name__ == '__main__':
     }
 
     # switch categories in y to the ones in classes_map
-    y = y.map(classes_map)
-
-    # # split in train - test
-    # x_train, x_test, y_train, y_test = train_test_split(X, y)
+    y = y.map(classes_map).to_numpy()
 
     # set parameters
     nm = config.get('norm_model', 'Standard') # try to get 'norm_model' from config files, uses 'Standart' if not founded
@@ -99,7 +116,7 @@ if __name__ == '__main__':
     categorical_columns = X.select_dtypes(include='object').columns.tolist() # list the categorical columns
     numerical_columns = [col for col in X if col not in categorical_columns] # list the numerical columns
     
-    # pipeline
+    # pipeline of Preprocessing
     pipeline = Pipeline(steps=[
         ('categories', ColumnTransformer(
             transformers=[
@@ -113,8 +130,34 @@ if __name__ == '__main__':
         ('scaler', norm_model)
     ])
 
-    res = pipeline.fit_transform(X, y)
+    X_transformed = pipeline.fit_transform(X, y)
+    # TODO: save dataset transformed
     
-    # test models
-    print(res.shape)
-    print(X.shape)
+    # print("Shape before: ",X.shape,"\n")
+    # print("Shape after: ",X_transformed.shape,"\n")
+    # print("Info of the dataset after the preprocessing: ", pd.DataFrame(X_transformed).info(),"\n")
+
+    # split in train - test
+    x_train, x_test, y_train, y_test = train_test_split(X_transformed, y)
+
+    # ["RandomForestClassifier","GradientBoostingClassifier","AdaBostClassifier","DecisionTree","LogisticRegression","ElasticNet","SVC","XGBoost","GaussianDB","LGBM","MLPClassifier"]
+    # reads the models in config file
+    models_names = config.get('models_names', ['LogisticRegression'])
+    
+    results = {}
+    # sees which model to use
+    for model_name in models_names:
+        # get the model 
+        model = instanciate_model(model_name)
+
+        # use the cross validation to get the average metrics of the model
+        cross_results = cross_validate(model, x_train, y_train, scoring=['accuracy', 'balanced_accuracy', 'f1_weighted', 'matthews_corrcoef', 'roc_auc', 'roc_auc_ovr_weighted'])
+        results[model.__class__.__name__] = {
+            'accuracy' : np.mean(cross_results['test_accuracy']),
+            'balanced_accuracy' : np.mean(cross_results['test_balanced_accuracy']),
+            'f1_weighted' : np.mean(cross_results['test_f1_weighted']),
+            'matthews_corrcoef' : np.mean(cross_results['test_matthews_corrcoef']),
+            'roc_auc_ovr_weighted' : np.mean(cross_results['test_roc_auc_ovr_weighted']),
+        }
+
+    pprint.pprint(results)
