@@ -1,3 +1,11 @@
+"""
+        ACA Project
+
+        ATHORS:
+            Joana Simões
+            Pedro Carrasco
+"""
+
 import pandas as pd
 import numpy as np 
 import seaborn as sns
@@ -8,9 +16,11 @@ import sys
 import datetime
 import json
 import pprint
+import time
 
 from utils import *
 
+# to ignore terminal warnings
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -26,6 +36,9 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import make_scorer
+from sklearn.ensemble import RandomForestClassifier
 
 # plot parametars
 plt.rcParams["figure.figsize"] = (20,12)
@@ -37,6 +50,7 @@ plt.rcParams['lines.linewidth'] = 3
 
 # TODO: move the function to utils.py
 def instanciate_model(model_name):
+    # TODO: add option to use model's parameters
     if model_name == 'LogisticRegression':
         model = LogisticRegression()
 
@@ -67,8 +81,10 @@ if __name__ == '__main__':
     # crate the new experience folder
     LOGS_PATH = os.path.join('logs', exp)
     os.makedirs(LOGS_PATH)
+    GRID_PATH = os.path.join(LOGS_PATH, 'grid_search')
+    os.makedirs(GRID_PATH)
 
-    # read config 
+    # gets the name of the config file and read´s it
     config_path = sys.argv[1]
     with open(config_path, 'r') as file:
         config = json.load(file)
@@ -131,33 +147,68 @@ if __name__ == '__main__':
     ])
 
     X_transformed = pipeline.fit_transform(X, y)
-    # TODO: save dataset transformed
     
-    # print("Shape before: ",X.shape,"\n")
-    # print("Shape after: ",X_transformed.shape,"\n")
-    # print("Info of the dataset after the preprocessing: ", pd.DataFrame(X_transformed).info(),"\n")
+    # save the transformed dataset
+    aux = pd.DataFrame(X_transformed)
+    aux['target_y'] = y
+    aux.to_csv(os.path.join(LOGS_PATH, 'transformed_dataset.csv'), index=False)
 
     # split in train - test
     x_train, x_test, y_train, y_test = train_test_split(X_transformed, y)
 
-    # ["RandomForestClassifier","GradientBoostingClassifier","AdaBostClassifier","DecisionTree","LogisticRegression","ElasticNet","SVC","XGBoost","GaussianDB","LGBM","MLPClassifier"]
     # reads the models in config file
-    models_names = config.get('models_names', ['LogisticRegression'])
+    models_names = config.get('models_names', {'LogisticRegression' : {}})
     
-    results = {}
-    # sees which model to use
-    for model_name in models_names:
+    results = pd.DataFrame()
+
+    scoring = {
+        'f1_weighted' : 'f1_weighted',
+        'accuracy' : 'accuracy',
+        'balanced_accuracy' : 'balanced_accuracy',
+        'matthews_corrcoef' : 'matthews_corrcoef',
+        'roc_auc_ovr_weighted' : 'roc_auc_ovr_weighted'
+    }
+
+    # for train, test in KFOLD
+    # sees which model to use and the model´s parameters
+    for model_name, params in models_names.items():
         # get the model 
         model = instanciate_model(model_name)
 
-        # use the cross validation to get the average metrics of the model
-        cross_results = cross_validate(model, x_train, y_train, scoring=['accuracy', 'balanced_accuracy', 'f1_weighted', 'matthews_corrcoef', 'roc_auc', 'roc_auc_ovr_weighted'])
-        results[model.__class__.__name__] = {
-            'accuracy' : np.mean(cross_results['test_accuracy']),
-            'balanced_accuracy' : np.mean(cross_results['test_balanced_accuracy']),
-            'f1_weighted' : np.mean(cross_results['test_f1_weighted']),
-            'matthews_corrcoef' : np.mean(cross_results['test_matthews_corrcoef']),
-            'roc_auc_ovr_weighted' : np.mean(cross_results['test_roc_auc_ovr_weighted']),
-        }
+        # grid_search to find the best model(TODO) with the best parameters
+        start = time.time()
 
-    pprint.pprint(results)
+        grid_search = GridSearchCV(
+            estimator = model, 
+            param_grid = params,
+            scoring = scoring,
+            refit = 'matthews_corrcoef',
+            verbose=2
+        )
+
+        # fitting the model    
+        grid_search.fit(x_train, y_train)
+
+        end = time.time()
+
+        print(f'Time to test {model_name}: {(end - start) / 60} minutes')
+
+        # store the results of grid search
+        aux = grid_search.cv_results_
+
+        pprint.pprint(aux)
+        
+        # create a pandas dataframe with the parameters and its means of the model tested
+        df = pd.DataFrame(aux)
+        df.to_csv(os.path.join(GRID_PATH, f'{model_name}_grid_search_{time.time()}.json'), index=False)
+        df['model_name'] = model_name
+        cols = [col for col in df.columns if col.startswith('std') or col.startswith('mean')]
+        cols = ['model_name', 'params'] + cols
+        df = pd.DataFrame(df[cols])
+        print(df)
+
+        results = pd.concat([results, df], ignore_index=True)
+        # save the dataset with the parameters and its means of the model tested
+    
+    results.to_csv(os.path.join(LOGS_PATH, 'model_results.csv'), index=False)
+

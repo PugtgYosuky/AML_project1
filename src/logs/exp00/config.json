@@ -1,0 +1,1 @@
+{"dataset": "./dataset/train_students.csv", "norm_model": "Standard", "number_best_features": 30, "variance_threshold": 0, "models_names": {"LogisticRegression": {"penalty": [null, "l1", "l2", "elasticnet"], "solver": ["saga", "sag", "lbfgs", "liblinear"], "warm_start": [true, false], "max_iter": [100, 300, 600], "multi_class": ["auto", "over", "multinomial"]}}}
