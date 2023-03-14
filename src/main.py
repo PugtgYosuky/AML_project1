@@ -24,11 +24,12 @@ from utils import *
 import warnings
 warnings.filterwarnings("ignore")
 
-from sklearn.model_selection import train_test_split, cross_validate, KFold
+from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold, SelectKBest
+
 
 #models
 from sklearn.linear_model import LogisticRegression
@@ -108,10 +109,10 @@ if __name__ == '__main__':
     # dict with classes map
     classes_map = {
         'normal' : 0,
-        'Dos' : 1,
-        'R2L' : 2,
-        'U2R' : 3,
-        'Probe' : 4
+        'Dos'    : 1,
+        'R2L'    : 2,
+        'U2R'    : 3,
+        'Probe'  : 4
     }
 
     # switch categories in y to the ones in classes_map
@@ -154,7 +155,7 @@ if __name__ == '__main__':
     aux.to_csv(os.path.join(LOGS_PATH, 'transformed_dataset.csv'), index=False)
 
     # split in train - test
-    x_train, x_test, y_train, y_test = train_test_split(X_transformed, y)
+    x_train, x_test, y_train, y_test = train_test_split(X_transformed, y, random_state=42)
 
     # reads the models in config file
     models_names = config.get('models_names', {'LogisticRegression' : {}})
@@ -162,11 +163,11 @@ if __name__ == '__main__':
     results = pd.DataFrame()
 
     scoring = {
-        'f1_weighted' : 'f1_weighted',
-        'accuracy' : 'accuracy',
-        'balanced_accuracy' : 'balanced_accuracy',
-        'matthews_corrcoef' : 'matthews_corrcoef',
-        'roc_auc_ovr_weighted' : 'roc_auc_ovr_weighted'
+        'f1_weighted'           : 'f1_weighted',
+        'accuracy'              : 'accuracy',
+        'balanced_accuracy'     : 'balanced_accuracy',
+        'matthews_corrcoef'     : 'matthews_corrcoef',
+        'roc_auc_ovr_weighted'  : 'roc_auc_ovr_weighted'
     }
 
     # for train, test in KFOLD
@@ -179,11 +180,13 @@ if __name__ == '__main__':
         start = time.time()
 
         grid_search = GridSearchCV(
-            estimator = model, 
-            param_grid = params,
-            scoring = scoring,
-            refit = 'matthews_corrcoef',
-            verbose=2
+            estimator   = model, 
+            param_grid  = params,
+            scoring     = scoring,
+            refit       = 'matthews_corrcoef',
+            verbose     = 2,
+            cv          = StratifiedKFold(n_splits = 5, random_state = 42, shuffle=True),
+            
         )
 
         # fitting the model    
