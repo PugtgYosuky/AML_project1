@@ -27,10 +27,7 @@ warnings.filterwarnings("ignore")
 
 
 from sklearn.metrics import make_scorer
-from sklearn.model_selection import GridSearchCV
-
-#!
-from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 
 
 # plot parameters
@@ -42,7 +39,43 @@ plt.rcParams['axes.facecolor'] = 'white'
 plt.rcParams['lines.linewidth'] = 3
 
 
+def grid_search(model, params, x_train, y_train, model_name):
+    scoring = {
+        'f1_weighted'           : 'f1_weighted',
+        'accuracy'              : 'accuracy',
+        'balanced_accuracy'     : 'balanced_accuracy',
+        'matthews_corrcoef'     : 'matthews_corrcoef',
+        'roc_auc_ovr_weighted'  : 'roc_auc_ovr_weighted'
+    }
+    start = time.time()
+    grid_search = GridSearchCV(
+        estimator   = model, 
+        param_grid  = params,
+        scoring     = scoring,
+        refit       = 'matthews_corrcoef',
+        cv          = StratifiedKFold(n_splits = 5, random_state = 42, shuffle=True),
+        verbose     = 2,
+        
+    )
 
+    # fitting the model    
+    grid_search.fit(x_train, y_train)
+    end = time.time()
+    print(f'Time to test grid search {model_name}: {(end - start) / 60} minutes')
+
+    # store the results of grid search
+    aux = grid_search.cv_results_
+
+    # create a pandas dataframe with the parameters and its means of the model tested
+    df = pd.DataFrame(aux)
+    df.to_csv(os.path.join(GRID_PATH, f'{model_name}_grid_search_{time.time()}.json'), index=False)
+    df['model_name'] = model_name
+    cols = [col for col in df.columns if col.startswith('std') or col.startswith('mean')]
+    cols = ['model_name', 'params'] + cols
+    df = pd.DataFrame(df[cols])
+    print(df)
+
+    return grid_search.best_estimaor, df
 # main funtion of python
 if __name__ == '__main__':
     # get experience from logs folder
@@ -68,6 +101,8 @@ if __name__ == '__main__':
     os.makedirs(LOGS_PATH)
     GRID_PATH = os.path.join(LOGS_PATH, 'grid_search')
     os.makedirs(GRID_PATH)
+    PREDICTIONS_PATH = os.path.join(LOGS_PATH, 'predictions')
+    os.makedirs(PREDICTIONS_PATH)
 
     # gets the name of the config file and read´s it
     config_path = sys.argv[1]
@@ -101,67 +136,48 @@ if __name__ == '__main__':
     # split in train - test
     x_train, x_test, y_train, y_test = train_test_split(X_transformed, y_transformed, random_state=42)
 
+    # to balance the dataset
+    balance_method = config.get('balance_dataset', None)
+    if balance_method:
+        x_train, y_train = dataset_balance(x_train, y_train, balance_method)
+
     # reads the models in config file
     models_names = config.get('models_names', {'LogisticRegression' : {}})
     
     results = pd.DataFrame()
+    best_models_results = pd.DataFrame()
 
-    scoring = {
-        'f1_weighted'           : 'f1_weighted',
-        'accuracy'              : 'accuracy',
-        'balanced_accuracy'     : 'balanced_accuracy',
-        'matthews_corrcoef'     : 'matthews_corrcoef',
-        'roc_auc_ovr_weighted'  : 'roc_auc_ovr_weighted'
-    }
-
+    use_grid_search = config.get('grid_search', False)
     # for train, test in KFOLD
     # sees which model to use and the model´s parameters
+    start = time.time()
     for model_name, params in models_names.items():
-        # get the model 
-        model = instanciate_model(model_name)
-
-        # grid_search to find the best model(TODO) with the best parameters
-        start = time.time()
-
-        grid_search = GridSearchCV(
-            estimator   = model, 
-            param_grid  = params,
-            scoring     = scoring,
-            refit       = 'matthews_corrcoef',
-            cv          = StratifiedKFold(n_splits = 5, random_state = 42, shuffle=True),
-            verbose     = 2,
-            
-        )
-
-        # fitting the model    
-        grid_search.fit(x_train, y_train)
-
-        #! priting the best params
-        # best_params = grid_search.best_params_
-        # print("\n\n\nbest_params: ",best_params,"\n\n\n")
-
-        end = time.time()
-
-        print(f'Time to test {model_name}: {(end - start) / 60} minutes')
-
-        # store the results of grid search
-        aux = grid_search.cv_results_
-
-        pprint.pprint(aux)
-        
-        # create a pandas dataframe with the parameters and its means of the model tested
-        df = pd.DataFrame(aux)
-        df.to_csv(os.path.join(GRID_PATH, f'{model_name}_grid_search_{time.time()}.json'), index=False)
-        df['model_name'] = model_name
-        cols = [col for col in df.columns if col.startswith('std') or col.startswith('mean')]
-        cols = ['model_name', 'params'] + cols
-        df = pd.DataFrame(df[cols])
-        print(df)
-
-        results = pd.concat([results, df], ignore_index=True)
+        print('MODEL:', model_name)
+        if use_grid_search:
+            # get the model 
+            model = instanciate_model(model_name)
+            model, df = grid_search(model, params, x_train, y_train, model_name)
+            results = pd.concat([results, df], ignore_index=True)
         # save the dataset with the parameters and its means
+        else:
+            model = instanciate_model(model_name, params)
 
-        # TODO: predict the best config of each model
-    
-    results.to_csv(os.path.join(LOGS_PATH, model_name+'_model_results.csv'), index=False)
+        model.fit(x_train, y_train)
+        y_pred = model.predict(x_test)
+        predictions = pd.DataFrame()
+        predictions['y_test'] = y_test
+        predictions['y_pred'] = y_pred
+        predictions.to_csv(os.path.join(PREDICTIONS_PATH, f'{model_name}_predictions.csv'), index=False)
+
+        # calculate metrics
+        model_metrics = calculate_metrics(y_test, y_pred)
+        pprint.pprint(model_metrics)
+        metrics = pd.DataFrame(model_metrics, index=[model_name])
+        best_models_results = pd.concat([best_models_results, metrics])
+        best_models_results.to_csv(os.path.join(LOGS_PATH, 'model_metrics.csv'))
+
+    end = time.time()
+    print('Time to test all models: ', (end-start)/60, 'minutes')
+
+    results.to_csv(os.path.join(LOGS_PATH, 'models_results.csv'), index=False)
 
