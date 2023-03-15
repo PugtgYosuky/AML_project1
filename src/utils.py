@@ -38,3 +38,4 @@ class CustomEncoder(BaseEstimator):
 
         return pd.DataFrame(X_encoded, columns=X.columns)
 
+# teste
