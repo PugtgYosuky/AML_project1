@@ -19,31 +19,21 @@ import pprint
 import time
 
 from utils import *
+from preprocess_data import *
 
 # to ignore terminal warnings
 import warnings
 warnings.filterwarnings("ignore")
 
-from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.feature_selection import VarianceThreshold, SelectKBest
+
+from sklearn.metrics import make_scorer
+from sklearn.model_selection import GridSearchCV
 
 #!
 from sklearn.pipeline import make_pipeline
 
-#models
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import make_scorer
-from sklearn.ensemble import RandomForestClassifier
 
-# plot parametars
+# plot parameters
 plt.rcParams["figure.figsize"] = (20,12)
 plt.rcParams['axes.grid'] = True
 plt.style.use('fivethirtyeight')
@@ -51,29 +41,7 @@ plt.rcParams['figure.facecolor'] = 'white'
 plt.rcParams['axes.facecolor'] = 'white'
 plt.rcParams['lines.linewidth'] = 3
 
-# TODO: move the function to utils.py
-def instanciate_model(model_name):
-    # TODO: add option to use model's parameters
-    if model_name == 'LogisticRegression':
-        model = LogisticRegression()
 
-    elif model_name == 'RandomForestClassifier':
-        model = RandomForestClassifier()
-
-    #!
-    elif model_name == 'KNeighborsClassifier':
-        model = KNeighborsClassifier()
-
-    elif model_name == 'DecisionTreeClassifier':
-        model = DecisionTreeClassifier()
-
-    elif model_name == 'GaussianNB':
-        model = GaussianNB()
-    
-    elif model_name == 'StandardScaler':
-        model = make_pipeline(StandardScaler(), SVC(gamma='auto'))
-    
-    return model
 
 # main funtion of python
 if __name__ == '__main__':
@@ -122,56 +90,16 @@ if __name__ == '__main__':
     # remove 'attack_type' column from X and saves it to 
     y = X.pop('attack_type')
 
-    # dict with classes map
-    classes_map = {
-        'normal' : 0,
-        'Dos'    : 1,
-        'R2L'    : 2,
-        'U2R'    : 3,
-        'Probe'  : 4
-    }
-
-    # switch categories in y to the ones in classes_map
-    y = y.map(classes_map).to_numpy()
-
-    # set parameters
-    nm = config.get('norm_model', 'Standard') # try to get 'norm_model' from config files, uses 'Standart' if not founded
-
-    # select which scaler to use
-    if nm == 'MinMax':
-        norm_model = MinMaxScaler()
-    elif nm == 'Robust':
-        norm_model = RobustScaler()
-    else:
-        norm_model = StandardScaler()
-
-    # columns types
-    categorical_columns = X.select_dtypes(include='object').columns.tolist() # list the categorical columns
-    numerical_columns = [col for col in X if col not in categorical_columns] # list the numerical columns
     
-    # pipeline of Preprocessing(Normalization, Feature Selection, Variance Selection, Scaler)
-    pipeline = Pipeline(steps=[
-        ('categories', ColumnTransformer(
-            transformers=[
-                ('cat', CustomEncoder(), categorical_columns),
-                ('num', DropUniqueColumns(), numerical_columns)
-            ], 
-            remainder='passthrough'
-        )),
-        ('feature_selection', SelectKBest(k=config.get('number_best_features', X.shape[1]))),
-        ('variance_selct', VarianceThreshold(threshold=config.get('variance_threshold', 0))),
-        ('scaler', norm_model)
-    ])
+    pipeline, X_transformed, y_transformed = create_fit_pipeline(config, X, y)
 
-    X_transformed = pipeline.fit_transform(X, y)
-    
     # save the transformed dataset
     aux = pd.DataFrame(X_transformed)
-    aux['target_y'] = y
+    aux['target_y'] = y_transformed
     aux.to_csv(os.path.join(LOGS_PATH, 'transformed_dataset.csv'), index=False)
 
     # split in train - test
-    x_train, x_test, y_train, y_test = train_test_split(X_transformed, y, random_state=42)
+    x_train, x_test, y_train, y_test = train_test_split(X_transformed, y_transformed, random_state=42)
 
     # reads the models in config file
     models_names = config.get('models_names', {'LogisticRegression' : {}})
@@ -200,8 +128,8 @@ if __name__ == '__main__':
             param_grid  = params,
             scoring     = scoring,
             refit       = 'matthews_corrcoef',
-            verbose     = 2,
             cv          = StratifiedKFold(n_splits = 5, random_state = 42, shuffle=True),
+            verbose     = 2,
             
         )
 
@@ -231,7 +159,9 @@ if __name__ == '__main__':
         print(df)
 
         results = pd.concat([results, df], ignore_index=True)
-        # save the dataset with the parameters and its means of the model tested
+        # save the dataset with the parameters and its means
+
+        # TODO: predict the best config of each model
     
     results.to_csv(os.path.join(LOGS_PATH, model_name+'_model_results.csv'), index=False)
 
