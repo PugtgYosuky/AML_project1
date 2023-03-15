@@ -30,6 +30,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold, SelectKBest
 
+#!
+from sklearn.pipeline import make_pipeline
 
 #models
 from sklearn.linear_model import LogisticRegression
@@ -57,6 +59,20 @@ def instanciate_model(model_name):
 
     elif model_name == 'RandomForestClassifier':
         model = RandomForestClassifier()
+
+    #!
+    elif model_name == 'KNeighborsClassifier':
+        model = KNeighborsClassifier()
+
+    elif model_name == 'DecisionTreeClassifier':
+        model = DecisionTreeClassifier()
+
+    elif model_name == 'GaussianNB':
+        model = GaussianNB()
+    
+    elif model_name == 'StandardScaler':
+        model = make_pipeline(StandardScaler(), SVC(gamma='auto'))
+    
     return model
 
 # main funtion of python
@@ -133,7 +149,7 @@ if __name__ == '__main__':
     categorical_columns = X.select_dtypes(include='object').columns.tolist() # list the categorical columns
     numerical_columns = [col for col in X if col not in categorical_columns] # list the numerical columns
     
-    # pipeline of Preprocessing
+    # pipeline of Preprocessing(Normalization, Feature Selection, Variance Selection, Scaler)
     pipeline = Pipeline(steps=[
         ('categories', ColumnTransformer(
             transformers=[
@@ -192,6 +208,10 @@ if __name__ == '__main__':
         # fitting the model    
         grid_search.fit(x_train, y_train)
 
+        #! priting the best params
+        # best_params = grid_search.best_params_
+        # print("\n\n\nbest_params: ",best_params,"\n\n\n")
+
         end = time.time()
 
         print(f'Time to test {model_name}: {(end - start) / 60} minutes')
@@ -213,5 +233,5 @@ if __name__ == '__main__':
         results = pd.concat([results, df], ignore_index=True)
         # save the dataset with the parameters and its means of the model tested
     
-    results.to_csv(os.path.join(LOGS_PATH, 'model_results.csv'), index=False)
+    results.to_csv(os.path.join(LOGS_PATH, model_name+'_model_results.csv'), index=False)
 
