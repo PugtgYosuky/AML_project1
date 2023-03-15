@@ -8,49 +8,48 @@
 import pandas as pd
 import numpy as np
 
-#! 
-from sklearn.datasets import make_classification # ????
-#from skrebate import ReliefF # ????
 from sklearn.model_selection import cross_validate
 import pprint
+from sklearn import metrics
 
-
-
-#models
+# models
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from lightgbm.sklearn import LGBMClassifier
+from xgboost import XGBClassifier
 
 
-# TODO: move the function to utils.py
-def instanciate_model(model_name, settings={"random_state":42}):
-    # TODO: add option to use model's parameters
+def instanciate_model(model_name, settings={}):
     if model_name == 'LogisticRegression':
-        model = LogisticRegression(**settings)
+        model = LogisticRegression(**settings, random_state=42)
 
     elif model_name == 'RandomForestClassifier':
-        model = RandomForestClassifier(**settings)
+        model = RandomForestClassifier(**settings, random_state=42)
 
     elif model_name == 'KNeighborsClassifier':
         model = KNeighborsClassifier(**settings)
 
     elif model_name == 'DecisionTreeClassifier':
-        model = DecisionTreeClassifier(**settings)
+        model = DecisionTreeClassifier(**settings, random_state=42)
 
     elif model_name == 'GaussianNB':
         model = GaussianNB(**settings)
     
     elif model_name == "SVC":
-        model = SVC(**settings)
+        model = SVC(**settings, random_state=42)
 
     elif model_name == "AdaBoostClassifier":
-        model = AdaBoostClassifier(**settings)
+        model = AdaBoostClassifier(**settings, random_state=42)
 
-    elif model_name == 'StandardScaler': # ??????
-        model = make_pipeline(StandardScaler(), SVC(gamma='auto'))
+    elif model_name == "XGBClassifier":
+        model = XGBClassifier(**settings, random_state=42)
+
+    elif model_name == "LGBMClassifier":
+        model = LGBMClassifier(**settings, random_state=42)
     
     return model
 
@@ -86,5 +85,12 @@ def train_model(path):
         best_model = data.sort_values(by=['mean_test_f1_weighted', 'mean_test_matthews_corrcoef'], ascending=False)
         print(best_model.iloc[0])
 
-
-## TODO: function to calculate metrics and save predictions
+def calculate_metrics (y_test, y_pred):
+    return {
+          'balanced_accuracy' : metrics.balanced_accuracy_score(y_test, y_pred),
+        #   'roc_auc_score' : metrics.roc_auc_score(y_test, y_pred),
+          'recall_weighthed' : metrics.recall_score(y_test, y_pred, average='weighted'), 
+          'f1_weighthed' : metrics.f1_score(y_test, y_pred, average='weighted'), 
+          'precision_weighthed' : metrics.precision_score(y_test, y_pred, average='weighted'), 
+          'matthews_corrcoef' : metrics.matthews_corrcoef(y_test, y_pred)
+    }
