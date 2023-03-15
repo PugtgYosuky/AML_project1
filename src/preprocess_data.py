@@ -12,11 +12,9 @@ from sklearn.base import BaseEstimator
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 
 # balance datasets
-from imblearn.under_sampling import RandomUnderSampler
-from imblearn.over_sampling import SMOTE, RandomOverSampler
+from imblearn.over_sampling import SMOTE
 from imblearn.combine import SMOTETomek, SMOTEENN
 
-from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
@@ -59,19 +57,9 @@ class CustomEncoder(BaseEstimator):
 
 #! Function to balancing de dataset. Receives X ,y , bmodel -> name of the model to use(SMOTE)
 def dataset_balance(X ,y , bmodel):
-
     if bmodel == "SMOTE":
-        #! using SMOTE to generate synthetic samples from the minority class by interpolating between existing samples
         smote = SMOTE(random_state=0)
-        X_resampled, y_resampled = smote.fit_resample(X, y)
-
-    elif bmodel == "RandomUnderSampler":
-        rus = RandomUnderSampler(random_state=0) # ?? dar drop
-        X_resampled, y_resampled = rus.fit_resample(X, y)   
-
-    elif bmodel == "RandomOverSampler": # ?? dar drop
-        ros = RandomOverSampler(random_state=0)
-        X_resampled, y_resampled = ros.fit_resample(X, y)
+        X_resampled, y_resampled = smote.fit_resample(X, y) 
 
     elif bmodel == "SMOTETomek":
         smotetomek = SMOTETomek(random_state=0)
@@ -83,8 +71,6 @@ def dataset_balance(X ,y , bmodel):
 
     return X_resampled,y_resampled
 
-
-# TODO: function to create the pipeline
 
 def create_fit_pipeline(config, X, y):
     # set parameters
@@ -111,7 +97,7 @@ def create_fit_pipeline(config, X, y):
             ], 
             remainder='passthrough'
         )),
-        ('feature_selection', SelectKBest(k=config.get('number_best_features', X.shape[1]))),
+        ('feature_selection', SelectKBest(k=config.get('number_best_features', 'all'))),
         ('variance_selct', VarianceThreshold(threshold=config.get('variance_threshold', 0))),
         ('scaler', norm_model)
     ])
