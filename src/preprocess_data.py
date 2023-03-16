@@ -51,7 +51,13 @@ class CustomEncoder(BaseEstimator):
     def transform(self, X, y=None):
         X_encoded = X.copy()
         for col in X:
-            X_encoded[col] = self.encoders[col].transform(X[col])
+            # to handle unseen values
+            column = X[col].to_numpy()
+            indexes = np.isin(column, self.encoders[col].classes_)
+            transformed = np.ones_like(column).astype(int) * -1
+            # transform values
+            transformed[indexes] = self.encoders[col].transform(column[indexes])
+            X_encoded[col] = transformed
 
         return pd.DataFrame(X_encoded, columns=X.columns)
 
