@@ -1,13 +1,20 @@
 {
     "dataset" : "./dataset/train_students.csv",
+    "target_dataset" : "./dataset/test_students.csv",
     "norm_model" : "Standard",
-    "number_best_features" : 30,
     "variance_threshold" : 0,
-    "models_names": {
-        "LogisticRegression" : {
-            "penalty" : ["l2"],
-            "max_iter" : [100, 150],
-            "solver" : ["saga"]
-        }
-    }
+    "models_names": [
+        ["LogisticRegression",  {}],
+        ["RandomForestClassifier" , {}],
+        ["KNeighborsClassifier" , {}],
+        ["DecisionTreeClassifier" , {}],
+        ["GaussianNB" , {}],
+        ["SVC" , {}],
+        ["AdaBoostClassifier" , {}],
+        ["XGBClassifier" , {}],
+        ["LGBMClassifier" , {}]
+    ]
+    ,
+    "grid_search" : false,
+    "ensemble" : true
 }

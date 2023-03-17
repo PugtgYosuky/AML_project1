@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np 
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy import stats
 from sklearn import metrics
 import os
 import sys
@@ -77,6 +78,23 @@ def grid_search(model, params, x_train, y_train, model_name, fold):
     print(df)
 
     return grid_search.best_estimator_, df, grid_search.best_params_
+
+def get_best_models_config(data):
+    """ returns the best config for each model tested according to the cross-validation results"""
+    # groups the results of all folds 
+    compare = data.groupby(['model', 'config']).mean()
+    # counts the number of time each config appears
+    compare['count'] = data.groupby(['model', 'config'])['fold'].count()
+    compare = compare.reset_index()
+    # sort the config by the number of time each one appears and by matthews_corrcoef
+    compare.sort_values(['count', 'matthews_corrcoef'], ascending=False)
+    best_models_config = []
+    for model in compare.model.unique():
+        model_data = compare.loc[compare.model == model]
+        model_data = model_data.sort_values(by=['count', 'matthews_corrcoef'], ascending=False)
+        best_models_config.append([model_data.iloc[0]['model'], model_data.iloc[0]['config']])
+    return best_models_config, compare
+
 # main funtion of python
 if __name__ == '__main__':
     # get experience from logs folder
@@ -156,7 +174,7 @@ if __name__ == '__main__':
             x_train, y_train = dataset_balance(x_train, y_train, balance_method)
 
         # reads the models from config file
-        models_names = config.get('models_names', {'LogisticRegression' : {}})
+        model_to_test = config.get('models_names', [['LogisticRegression',  {}]])
         
         results = pd.DataFrame()
 
@@ -164,7 +182,7 @@ if __name__ == '__main__':
         # for train, test in KFOLD
         # sees which model to use and the model´s parameters
         start = time.time()
-        for model_name, params in models_names.items():
+        for model_name, params in model_to_test:
             print('MODEL:', model_name)
             if use_grid_search:
                 # get the model 
@@ -205,6 +223,7 @@ if __name__ == '__main__':
     best_models_results.to_csv(os.path.join(LOGS_PATH, 'model_metrics.csv'), index=False)
     print('TOTAL TIME - 5-FOLDS:', (end_total - start_total) / 60, 'minutes')
 
+    # **************** PREDICT KAGGLE ****************
     # read target dataset
     target_data = pd.read_csv(config['target_dataset'])
     sample_ID = target_data.pop('SampleID')
@@ -212,34 +231,32 @@ if __name__ == '__main__':
     # transform test dataset
     target_data = pipeline.transform(target_data)
 
-    # select the best model
-    best_model_config = best_models_results.loc[best_models_results.matthews_corrcoef == best_models_results.matthews_corrcoef.max()]
-    print('\n\n************* BEST MODEL *************\n')
-    print(best_model_config)
-
-    best_model_name = best_model_config.model.values[0]
-    print(type(best_model_config.config.values[0]))
-    print(json.loads(best_model_config.config.values[0]))
-    if type(best_model_config.config.values[0]) is dict:
-        best_params = best_model_config.config.values[0]
-    else:
-        best_params = json.loads(best_model_config.config.values[0])
-
-    best_model = instanciate_model(best_model_name, best_params)
-
     # to balance the dataset
     if balance_method:
         X_transformed, y_transformed = dataset_balance(X_transformed, y_transformed, balance_method)
-    
-    if config.get('ensemble', False):
+
+    # select the best model
+    ensemble_predictions = pd.DataFrame()
+    best_models, ranking = get_best_models_config(best_models_results)
+    print("\n\n BEST CONFIGS \n")
+    print(ranking)
+    for best_model_name, params in best_models:
+        best_params = json.loads(params)
+
+        best_model = instanciate_model(best_model_name, best_params)
         # fit best model
         best_model.fit(X_transformed, y_transformed)
         
         # predict target
         preds = best_model.predict(target_data)
 
-        output_predictions['Class'] = preds
-
-        output_predictions.to_csv(os.path.join(TARGET_PATH, 'best_model_name_preds.csv'), index=False)
-        # TODO: ensemble dos melhores valores
+        model_predictions = output_predictions.copy()
+        model_predictions['Class'] = preds
+        ensemble_predictions[best_model_name] = preds
+        # save model predictions
+        model_predictions.to_csv(os.path.join(TARGET_PATH, f'{best_model_name}_preds.csv'), index=False)
+    
+    # ensemble the results
+    output_predictions['Class'] = stats.mode(ensemble_predictions, axis=1, keepdims=True).mode
+    output_predictions.to_csv(os.path.join(TARGET_PATH, f'combined_preds.csv'), index=False)
 
