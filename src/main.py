@@ -81,19 +81,21 @@ def grid_search(model, params, x_train, y_train, model_name, fold):
 
 def get_best_models_config(data):
     """ returns the best config for each model tested according to the cross-validation results"""
-    # groups the results of all folds 
     compare = data.groupby(['model', 'config']).mean()
-    # counts the number of time each config appears
     compare['count'] = data.groupby(['model', 'config'])['fold'].count()
     compare = compare.reset_index()
-    # sort the config by the number of time each one appears and by matthews_corrcoef
-    compare.sort_values(['count', 'matthews_corrcoef'], ascending=False)
+    compare = compare.sort_values(['count', 'matthews_corrcoef'], ascending=False)
     best_models_config = []
+
+    best_models = pd.DataFrame()
     for model in compare.model.unique():
         model_data = compare.loc[compare.model == model]
-        model_data = model_data.sort_values(by=['count', 'matthews_corrcoef'], ascending=False)
+        model_data = model_data.sort_values(by=['count', 'matthews_corrcoef', 'f1_weighthed'], ascending=False)
         best_models_config.append([model_data.iloc[0]['model'], model_data.iloc[0]['config']])
-    return best_models_config, compare
+        best_models = pd.concat([best_models, pd.DataFrame(model_data.iloc[0]).T], ignore_index=True)
+    
+    best_models.drop(['fold'], axis=1)
+    return best_models_config, best_models
 
 # main funtion of python
 if __name__ == '__main__':
@@ -163,7 +165,7 @@ if __name__ == '__main__':
     start_total = time.time()
     best_models_results = pd.DataFrame()
     for fold, (train_indexes, test_indexes) in enumerate(kfold.split(X_transformed, y_transformed)):
-        print(f'##############{fold+1}-FOLD##############')
+        print(f'############## {fold+1}-FOLD ##############')
         x_train = X_transformed[train_indexes]
         y_train = y_transformed[train_indexes]
         x_test = X_transformed[test_indexes]
@@ -240,6 +242,7 @@ if __name__ == '__main__':
     best_models, ranking = get_best_models_config(best_models_results)
     print("\n\n BEST CONFIGS \n")
     print(ranking)
+    ranking.to_csv(os.path.join(LOGS_PATH, 'models_mean_results.csv'), index=False)
     for best_model_name, params in best_models:
         best_params = json.loads(params)
 

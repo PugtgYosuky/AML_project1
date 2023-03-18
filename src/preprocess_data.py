@@ -84,10 +84,13 @@ def create_fit_pipeline(config, X, y):
 
     # select which scaler to use
     if nm == 'MinMax':
+        print('MinMaxScaler')
         norm_model = MinMaxScaler()
     elif nm == 'Robust':
+        print('RobustScaler')
         norm_model = RobustScaler()
     else:
+        print('StandardScaler')
         norm_model = StandardScaler()
 
     # columns types
@@ -104,7 +107,7 @@ def create_fit_pipeline(config, X, y):
             remainder='passthrough'
         )),
         ('feature_selection', SelectKBest(k=config.get('number_best_features', 'all'))),
-        ('variance_selct', VarianceThreshold(threshold=config.get('variance_threshold', 0))),
+        ('variance_select', VarianceThreshold(threshold=config.get('variance_threshold', 0))),
         ('scaler', norm_model)
     ])
 

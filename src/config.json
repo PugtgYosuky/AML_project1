@@ -1,8 +1,7 @@
 {
     "dataset" : "./dataset/train_students.csv",
     "target_dataset" : "./dataset/test_students.csv",
-    "norm_model" : "Standard",
-    "variance_threshold" : 0,
+    "norm_model" : "Robust",
     "models_names": [
         ["LogisticRegression",  {}],
         ["RandomForestClassifier" , {}],
