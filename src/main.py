@@ -21,6 +21,7 @@ import time
 
 from utils import *
 from preprocess_data import *
+from sklearn.ensemble import VotingClassifier
 
 # to ignore terminal warnings
 import warnings
@@ -97,6 +98,28 @@ def get_best_models_config(data):
     best_models.drop(['fold'], axis=1)
     return best_models_config, best_models
 
+def train_predict_model(model, save_path, x_train, y_train, x_test, y_test, fold, model_name, params):
+    print('MODEL:', model_name)
+    start_model = time.time()
+    model.fit(x_train, y_train)
+    end_model = time.time()
+    y_pred = model.predict(x_test)
+    predictions = pd.DataFrame()
+    predictions['y_test'] = y_test
+    predictions['y_pred'] = y_pred
+    predictions.to_csv(os.path.join(save_path, f'{model_name}_fold{fold+1}_predictions.csv'), index=False)
+    # calculate metrics
+    model_metrics = calculate_metrics(y_test, y_pred)
+    model_metrics['time(minutes)'] = (end_model-start_model) / 60 # add fitting time to the evaluation
+    
+    model_metrics['fold'] = fold + 1 # save fold
+    model_metrics['config'] = json.dumps(params) # save config 
+    model_metrics['model'] = model_name
+    pprint.pprint(model_metrics)
+    metrics = pd.DataFrame(model_metrics, index=[0])
+    #reorganize dataframe
+    metrics = metrics[['model', 'config', 'fold', 'f1_weighthed','matthews_corrcoef', 'balanced_accuracy','precision_weighthed','recall_weighthed','time(minutes)']]
+    return metrics
 # main funtion of python
 if __name__ == '__main__':
     # get experience from logs folder
@@ -134,7 +157,7 @@ if __name__ == '__main__':
         
     # save config in logs folder
     with open(os.path.join(LOGS_PATH, 'config.json'), 'w') as outfile:
-        json.dump(config, outfile)
+        json.dump(config, outfile, indent=1)
 
     # read dataset
     data = pd.read_csv(config['dataset'])    
@@ -158,74 +181,80 @@ if __name__ == '__main__':
 
     # split in train - test
     # x_train, x_test, y_train, y_test = train_test_split(X_transformed, y_transformed, random_state=42)
-
+    models_to_test = config.get('models_names', [['LogisticRegression',  {}]])
+    use_grid_search = config.get('grid_search', False)
     balance_method = config.get('balance_dataset', None)
-    kfold = StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
 
-    start_total = time.time()
-    best_models_results = pd.DataFrame()
-    for fold, (train_indexes, test_indexes) in enumerate(kfold.split(X_transformed, y_transformed)):
-        print(f'############## {fold+1}-FOLD ##############')
-        x_train = X_transformed[train_indexes]
-        y_train = y_transformed[train_indexes]
-        x_test = X_transformed[test_indexes]
-        y_test = y_transformed[test_indexes]
+    train_only = config.get('train_only', False)
+    if not train_only:
+        kfold = StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
 
-        # to balance the dataset
-        if balance_method:
-            x_train, y_train = dataset_balance(x_train, y_train, balance_method)
+        start_total = time.time()
+        best_models_results = pd.DataFrame()
+        for fold, (train_indexes, test_indexes) in enumerate(kfold.split(X_transformed, y_transformed)):
+            print(f'############## {fold+1}-FOLD ##############')
+            x_train = X_transformed[train_indexes]
+            y_train = y_transformed[train_indexes]
+            x_test = X_transformed[test_indexes]
+            y_test = y_transformed[test_indexes]
 
-        # reads the models from config file
-        model_to_test = config.get('models_names', [['LogisticRegression',  {}]])
-        
-        results = pd.DataFrame()
+            # to balance the dataset
+            if balance_method:
+                x_train, y_train = dataset_balance(x_train, y_train, balance_method)
 
-        use_grid_search = config.get('grid_search', False)
-        # for train, test in KFOLD
-        # sees which model to use and the model´s parameters
-        start = time.time()
-        for model_name, params in model_to_test:
-            print('MODEL:', model_name)
-            if use_grid_search:
-                # get the model 
-                model = instanciate_model(model_name)
-                model, df, params = grid_search(model, params, x_train, y_train, model_name, fold)
-                results = pd.concat([results, df], ignore_index=True)
-
-            model = instanciate_model(model_name, params)
-
-            start_model = time.time()
-            model.fit(x_train, y_train)
-            end_model = time.time()
-            y_pred = model.predict(x_test)
-            predictions = pd.DataFrame()
-            predictions['y_test'] = y_test
-            predictions['y_pred'] = y_pred
-            predictions.to_csv(os.path.join(PREDICTIONS_PATH, f'{model_name}_fold{fold+1}_predictions.csv'), index=False)
-
-            # calculate metrics
-            model_metrics = calculate_metrics(y_test, y_pred)
-            model_metrics['time(minutes)'] = (end_model-start_model) / 60 # add fitting time to the evaluation
+            # reads the models from config file
             
-            model_metrics['fold'] = fold + 1 # save fold
-            model_metrics['config'] = json.dumps(params) # save config 
-            model_metrics['model'] = model_name
-            pprint.pprint(model_metrics)
-            metrics = pd.DataFrame(model_metrics, index=[0])
-            #reorganize dataframe
-            metrics = metrics[['model', 'config', 'fold', 'f1_weighthed','matthews_corrcoef', 'balanced_accuracy','precision_weighthed','recall_weighthed','time(minutes)']]
+            results = pd.DataFrame()
+
+            # for train, test in KFOLD
+            # sees which model to use and the model´s parameters
+            start = time.time()
+            ensemble_models = []
+            models_weights = []
+            for model_name, params in models_to_test:
+                
+                if use_grid_search:
+                    # get the model 
+                    model = instanciate_model(model_name)
+                    model, df, params = grid_search(model, params, x_train, y_train, model_name, fold)
+                    results = pd.concat([results, df], ignore_index=True)
+
+                model = instanciate_model(model_name, params)
+                # add the instanciated model to the list for ensemble
+                ensemble_models.append((model_name, instanciate_model(model_name, params)))
+                metrics = train_predict_model(model, PREDICTIONS_PATH, x_train, y_train, x_test, y_test, fold, model_name, params)
+                models_weights.append(metrics['balanced_accuracy'][0])
+                best_models_results = pd.concat([best_models_results, metrics], ignore_index=True)
+
+            # soft normalization of the weights
+            models_weights = np.array(models_weights)
+            models_weights /= np.sum(models_weights)
+            # print(ensemble_models)
+            # print(models_weights)
+            majority = VotingClassifier(
+                estimators=ensemble_models,
+                weights = models_weights
+            )
+            metrics = train_predict_model(model, PREDICTIONS_PATH, x_train, y_train, x_test, y_test, fold, 'VajorityVoting', None)
             best_models_results = pd.concat([best_models_results, metrics], ignore_index=True)
 
-        end = time.time()
-        print(f'\n[{fold+1}-fold] Time to test all models: ', (end-start)/60, 'minutes')
+            end = time.time()
+            print(f'\n[{fold+1}-fold] Time to test all models: ', (end-start)/60, 'minutes')
 
-        results.to_csv(os.path.join(LOGS_PATH, 'grid_results.csv'), index=False)
+            results.to_csv(os.path.join(LOGS_PATH, 'grid_results.csv'), index=False)
 
-    end_total = time.time()
-    best_models_results.to_csv(os.path.join(LOGS_PATH, 'model_metrics.csv'), index=False)
-    print('TOTAL TIME - 5-FOLDS:', (end_total - start_total) / 60, 'minutes')
+        end_total = time.time()
+        best_models_results.to_csv(os.path.join(LOGS_PATH, 'model_metrics.csv'), index=False)
+        print('TOTAL TIME - 5-FOLDS:', (end_total - start_total) / 60, 'minutes')
 
+        models_to_test, ranking = get_best_models_config(best_models_results)
+        
+        print("\n\n BEST CONFIGS \n")
+        print(ranking)
+        ranking.to_csv(os.path.join(LOGS_PATH, 'models_mean_results.csv'), index=False)
+    
     # **************** PREDICT KAGGLE ****************
+    print('**************** PREDICT KAGGLE ****************')
     # read target dataset
     target_data = pd.read_csv(config['target_dataset'])
     sample_ID = target_data.pop('SampleID')
@@ -239,14 +268,15 @@ if __name__ == '__main__':
 
     # select the best model
     ensemble_predictions = pd.DataFrame()
-    best_models, ranking = get_best_models_config(best_models_results)
-    print("\n\n BEST CONFIGS \n")
-    print(ranking)
-    ranking.to_csv(os.path.join(LOGS_PATH, 'models_mean_results.csv'), index=False)
-    for best_model_name, params in best_models:
-        best_params = json.loads(params)
+    ensemble_models = []
+    for best_model_name, best_params in models_to_test:
+        print('MODEL', best_model_name)
+        if type(best_params) is not dict:
+            best_params = json.loads(best_params)
 
-        best_model = instanciate_model(best_model_name, best_params)
+        if best_model_name != 'VajorityVoting':
+            best_model = instanciate_model(best_model_name, best_params)
+            ensemble_models.append((best_model_name, instanciate_model(best_model_name, best_params)))
         # fit best model
         best_model.fit(X_transformed, y_transformed)
         
