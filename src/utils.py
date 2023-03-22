@@ -19,6 +19,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.neural_network import MLPClassifier
 from lightgbm.sklearn import LGBMClassifier
 from xgboost import XGBClassifier
 
@@ -39,17 +40,20 @@ def instanciate_model(model_name, settings={}):
     elif model_name == 'GaussianNB':
         model = GaussianNB(**settings)
     
-    elif model_name == "SVC":
+    elif model_name == 'SVC':
         model = SVC(**settings, random_state=42)
 
-    elif model_name == "AdaBoostClassifier":
+    elif model_name == 'AdaBoostClassifier':
         model = AdaBoostClassifier(**settings, random_state=42)
 
-    elif model_name == "XGBClassifier":
+    elif model_name == 'XGBClassifier':
         model = XGBClassifier(**settings, random_state=42)
 
-    elif model_name == "LGBMClassifier":
+    elif model_name == 'LGBMClassifier':
         model = LGBMClassifier(**settings, random_state=42)
+    
+    elif model_name == 'MLPClassifier':
+        model = MLPClassifier(**settings, random_state=42)
     
     return model
 
