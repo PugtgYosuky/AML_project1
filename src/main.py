@@ -40,6 +40,11 @@ plt.rcParams['figure.facecolor'] = 'white'
 plt.rcParams['axes.facecolor'] = 'white'
 plt.rcParams['lines.linewidth'] = 3
 
+def majority_voting(results, weights):
+    """ Function from the professor slides"""
+    aux = np.bincount(results, weights=weights)
+    return np.argmax(aux)
+
 
 def grid_search(model, params, x_train, y_train, model_name, fold):
     scoring = {
@@ -87,30 +92,28 @@ def get_best_models_config(data):
     compare = compare.reset_index()
     compare = compare.sort_values(['count', 'matthews_corrcoef'], ascending=False)
     best_models_config = []
+    best_weights = []
 
     best_models = pd.DataFrame()
     for model in compare.model.unique():
         model_data = compare.loc[compare.model == model]
         model_data = model_data.sort_values(by=['count', 'matthews_corrcoef', 'f1_weighthed'], ascending=False)
-        best_models_config.append([model_data.iloc[0]['model'], model_data.iloc[0]['config']])
+        if model != 'MajorityVoting':
+            best_models_config.append([model_data.iloc[0]['model'], model_data.iloc[0]['config']])
+            best_weights.append(model_data.iloc[0]['matthews_corrcoef'])
         best_models = pd.concat([best_models, pd.DataFrame(model_data.iloc[0]).T], ignore_index=True)
     
     best_models.drop(['fold'], axis=1)
-    return best_models_config, best_models
+    return best_models_config, best_weights,  best_models
 
-def train_predict_model(model, save_path, x_train, y_train, x_test, y_test, fold, model_name, params):
-    print('MODEL:', model_name)
-    start_model = time.time()
-    model.fit(x_train, y_train)
-    end_model = time.time()
-    y_pred = model.predict(x_test)
+def train_predict_model(save_path, y_test, y_pred, fold, model_name, params, total_time):
     predictions = pd.DataFrame()
     predictions['y_test'] = y_test
     predictions['y_pred'] = y_pred
     predictions.to_csv(os.path.join(save_path, f'{model_name}_fold{fold+1}_predictions.csv'), index=False)
     # calculate metrics
     model_metrics = calculate_metrics(y_test, y_pred)
-    model_metrics['time(minutes)'] = (end_model-start_model) / 60 # add fitting time to the evaluation
+    model_metrics['time(minutes)'] = (total_time) / 60 # add fitting time to the evaluation
     
     model_metrics['fold'] = fold + 1 # save fold
     model_metrics['config'] = json.dumps(params) # save config 
@@ -185,6 +188,8 @@ if __name__ == '__main__':
     use_grid_search = config.get('grid_search', False)
     balance_method = config.get('balance_dataset', None)
 
+    weights_models = [1/len(models_to_test)] * len(models_to_test)
+
     train_only = config.get('train_only', False)
     if not train_only:
         kfold = StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
@@ -211,6 +216,7 @@ if __name__ == '__main__':
             start = time.time()
             ensemble_models = []
             models_weights = []
+            ensemble_predictions = pd.DataFrame()
             for model_name, params in models_to_test:
                 
                 if use_grid_search:
@@ -222,21 +228,33 @@ if __name__ == '__main__':
                 model = instanciate_model(model_name, params)
                 # add the instanciated model to the list for ensemble
                 ensemble_models.append((model_name, instanciate_model(model_name, params)))
-                metrics = train_predict_model(model, PREDICTIONS_PATH, x_train, y_train, x_test, y_test, fold, model_name, params)
-                models_weights.append(metrics['balanced_accuracy'][0])
+                # metrics = train_predict_model(model, PREDICTIONS_PATH, x_train, y_train, x_test, y_test, fold, model_name, params)
+                print('MODEL:', model_name)
+                start_model = time.time()
+                model.fit(x_train, y_train)
+                end_model = time.time()
+                y_pred = model.predict(x_test)
+                ensemble_predictions[f'{model_name}_{time.time()}'] = y_pred
+                metrics = train_predict_model(PREDICTIONS_PATH, y_test, y_pred, fold, model_name, params, end_model - start_model)
+                models_weights.append(metrics['matthews_corrcoef'][0])
                 best_models_results = pd.concat([best_models_results, metrics], ignore_index=True)
 
             # soft normalization of the weights
             models_weights = np.array(models_weights)
             models_weights /= np.sum(models_weights)
+            print('MODEL:', 'MajorityVoting')
+            voting_preds = ensemble_predictions.apply(majority_voting, axis=1, weights=models_weights)
+            metrics = train_predict_model(PREDICTIONS_PATH, y_test, voting_preds, fold, 'MajorityVoting', params, 0)
+            best_models_results = pd.concat([best_models_results, metrics], ignore_index=True)
+            
+
             # print(ensemble_models)
             # print(models_weights)
-            majority = VotingClassifier(
-                estimators=ensemble_models,
-                weights = models_weights
-            )
-            metrics = train_predict_model(model, PREDICTIONS_PATH, x_train, y_train, x_test, y_test, fold, 'VajorityVoting', None)
-            best_models_results = pd.concat([best_models_results, metrics], ignore_index=True)
+            # majority = VotingClassifier(
+            #     estimators=ensemble_models,
+            #     weights = models_weights
+            # )
+            # metrics = train_predict_model(model, PREDICTIONS_PATH, x_train, y_train, x_test, y_test, fold, 'VajorityVoting', None)
 
             end = time.time()
             print(f'\n[{fold+1}-fold] Time to test all models: ', (end-start)/60, 'minutes')
@@ -247,7 +265,9 @@ if __name__ == '__main__':
         best_models_results.to_csv(os.path.join(LOGS_PATH, 'model_metrics.csv'), index=False)
         print('TOTAL TIME - 5-FOLDS:', (end_total - start_total) / 60, 'minutes')
 
-        models_to_test, ranking = get_best_models_config(best_models_results)
+        models_to_test, weights_models,  ranking = get_best_models_config(best_models_results)
+        weights_models = np.array(weights_models)
+        weights_models /= np.sum(weights_models)
         
         print("\n\n BEST CONFIGS \n")
         print(ranking)
@@ -274,9 +294,8 @@ if __name__ == '__main__':
         if type(best_params) is not dict:
             best_params = json.loads(best_params)
 
-        if best_model_name != 'VajorityVoting':
-            best_model = instanciate_model(best_model_name, best_params)
-            ensemble_models.append((best_model_name, instanciate_model(best_model_name, best_params)))
+        best_model = instanciate_model(best_model_name, best_params)
+        ensemble_models.append((best_model_name, instanciate_model(best_model_name, best_params)))
         # fit best model
         best_model.fit(X_transformed, y_transformed)
         
@@ -290,6 +309,7 @@ if __name__ == '__main__':
         model_predictions.to_csv(os.path.join(TARGET_PATH, f'{best_model_name}_preds.csv'), index=False)
     
     # ensemble the results
-    output_predictions['Class'] = stats.mode(ensemble_predictions, axis=1, keepdims=True).mode
+    voting_preds = ensemble_predictions.apply(majority_voting, axis=1, weights=weights_models)
+    output_predictions['Class'] = voting_preds
     output_predictions.to_csv(os.path.join(TARGET_PATH, f'combined_preds.csv'), index=False)
 
