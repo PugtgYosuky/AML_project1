@@ -1,19 +1,18 @@
 {
     "dataset" : "./dataset/train_students.csv",
     "target_dataset" : "./dataset/test_students.csv",
-    "norm_model" : "Robust",
+    "norm_model" : "MinMax",
     "models_names": [
-        ["LogisticRegression",  {}],
         ["RandomForestClassifier" , {}],
         ["KNeighborsClassifier" , {}],
         ["DecisionTreeClassifier" , {}],
-        ["GaussianNB" , {}],
-        ["SVC" , {}],
-        ["AdaBoostClassifier" , {}],
         ["XGBClassifier" , {}],
-        ["LGBMClassifier" , {}]
+        ["LGBMClassifier" , {}],
+        ["MLPClassifier", {}]
     ]
     ,
     "grid_search" : false,
-    "ensemble" : true
+    "ensemble" : true,
+    "train_only" : false,
+    "balance_dataset" : "SMOTETomek"
 }
