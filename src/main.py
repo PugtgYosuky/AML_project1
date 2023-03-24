@@ -319,7 +319,7 @@ if __name__ == '__main__':
         model_predictions['Class'] = preds
         ensemble_predictions[best_model_name + str(count)] = preds
         # save model predictions
-        model_predictions.to_csv(os.path.join(TARGET_PATH, f'{best_model_name + str(count)}'), index=False)
+        model_predictions.to_csv(os.path.join(TARGET_PATH, f'{best_model_name + str(count)}.csv'), index=False)
         count += 1
     # ensemble the results
     voting_preds = ensemble_predictions.apply(majority_voting, axis=1, weights=weights_models)
