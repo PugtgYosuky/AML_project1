@@ -20,20 +20,18 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold, SelectKBest
 
-class DropUniqueColumns(BaseEstimator):
-    def __init__(self, threshold=0.8):
+class DropColumns(BaseEstimator):
+    def __init__(self, columns=[], threshold=0.8):
         self.threshold = threshold
+        self.columns = columns
     def fit(self, X, y=None):
-        # drop columns with just one value
         X = pd.DataFrame(X)
-        self.cols_to_drop = X.columns[X.nunique() == 1]
-        # correlation = X.corr(numeric_only=True)
-        # correlated_features = correlation.abs() > self.threshold
+        self.columns += list(X.columns[X.nunique() == 1])
         return self
 
     def transform(self, X, y=None):
         X = pd.DataFrame(X)
-        preprocessed = X.drop(self.cols_to_drop, axis=1)
+        preprocessed = X.drop(self.columns, axis=1)
         return preprocessed
 
 
@@ -96,16 +94,18 @@ def create_fit_pipeline(config, X, y):
     # columns types
     categorical_columns = X.select_dtypes(include='object').columns.tolist() # list the categorical columns
     numerical_columns = [col for col in X if col not in categorical_columns] # list the numerical columns
-
+    drop = DropColumns(config.get('columns_to_drop', []))
+    print(type(drop))
     # pipeline of Preprocessing(Normalization, Feature Selection, Variance Selection, Scaler)
     pipeline = Pipeline(steps=[
         ('categories', ColumnTransformer(
             transformers=[
-                ('cat', CustomEncoder(), categorical_columns),
-                ('num', DropUniqueColumns(), numerical_columns)
+                ('cat', CustomEncoder(), categorical_columns)
             ], 
-            remainder='passthrough'
+            remainder='passthrough',
+            verbose_feature_names_out=False
         )),
+        ('remove_cols', drop),
         ('feature_selection', SelectKBest(k=config.get('number_best_features', 'all'))),
         ('variance_select', VarianceThreshold(threshold=config.get('variance_threshold', 0))),
         ('scaler', norm_model)

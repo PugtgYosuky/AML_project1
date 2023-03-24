@@ -18,6 +18,9 @@ import datetime
 import json
 import pprint
 import time
+from sklearn import set_config
+
+set_config(transform_output='pandas')
 
 from utils import *
 from preprocess_data import *
@@ -174,14 +177,16 @@ if __name__ == '__main__':
     # remove 'attack_type' column from X and saves it to 
     y = X.pop('attack_type')
 
-    
+    print(X.shape)    
     pipeline, X_transformed, y_transformed = create_fit_pipeline(config, X, y)
-
+    print(X_transformed.shape)
+    print(X_transformed.columns)
+    
     # save the transformed dataset
-    aux = pd.DataFrame(X_transformed)
+    aux = X_transformed.copy()
     aux['target_y'] = y_transformed
     aux.to_csv(os.path.join(LOGS_PATH, 'transformed_dataset.csv'), index=False)
-
+    input()
     # split in train - test
     # x_train, x_test, y_train, y_test = train_test_split(X_transformed, y_transformed, random_state=42)
     models_to_test = config.get('models_names', [['LogisticRegression',  {}]])
