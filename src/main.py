@@ -186,7 +186,8 @@ if __name__ == '__main__':
     aux = X_transformed.copy()
     aux['target_y'] = y_transformed
     aux.to_csv(os.path.join(LOGS_PATH, 'transformed_dataset.csv'), index=False)
-    input()
+    X_transformed = X_transformed.to_numpy()
+
     # split in train - test
     # x_train, x_test, y_train, y_test = train_test_split(X_transformed, y_transformed, random_state=42)
     models_to_test = config.get('models_names', [['LogisticRegression',  {}]])
