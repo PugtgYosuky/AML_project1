@@ -3,16 +3,14 @@
     "target_dataset" : "./dataset/test_students.csv",
     "norm_model" : "MinMax",
     "models_names": [
-        ["RandomForestClassifier" , {}],
-        ["KNeighborsClassifier" , {}],
-        ["DecisionTreeClassifier" , {}],
-        ["XGBClassifier" , {}],
-        ["LGBMClassifier" , {}],
-        ["MLPClassifier", {}]
+        ["RandomForestClassifier" ,{}],
+        ["DecisionTreeClassifier",{}],
+        ["XGBClassifier", {}],
+        ["LGBMClassifier", {}]
     ]
     ,
     "grid_search" : false,
     "ensemble" : true,
     "train_only" : false,
-    "balance_dataset" : "SMOTETomek"
+    "columns_to_drop" : ["dst_host_count", "num_root"]
 }
