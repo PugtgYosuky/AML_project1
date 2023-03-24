@@ -88,7 +88,7 @@ def grid_search(model, params, x_train, y_train, model_name, fold):
 
     return grid_search.best_estimator_, df, grid_search.best_params_
 
-def get_best_models_config(data):
+def get_best_models_config(data, best_num=3):
     """ returns the best config for each model tested according to the cross-validation results"""
     compare = data.groupby(['model', 'config']).mean()
     compare['count'] = data.groupby(['model', 'config'])['fold'].count()
@@ -99,12 +99,16 @@ def get_best_models_config(data):
 
     best_models = pd.DataFrame()
     for model in compare.model.unique():
+        if model == 'MajorityVoting':
+            continue
         model_data = compare.loc[compare.model == model]
         model_data = model_data.sort_values(by=['count', 'matthews_corrcoef', 'f1_weighthed'], ascending=False)
-        if model != 'MajorityVoting':
-            best_models_config.append([model_data.iloc[0]['model'], model_data.iloc[0]['config']])
-            best_weights.append(model_data.iloc[0]['matthews_corrcoef'])
-        best_models = pd.concat([best_models, pd.DataFrame(model_data.iloc[0]).T], ignore_index=True)
+        num_samples = len(model_data)
+        num_samples = min(num_samples, best_num) # save the best three models of each type
+        for i in range(num_samples):
+            best_models_config.append([model_data.iloc[i]['model'], model_data.iloc[i]['config']])
+            best_weights.append(model_data.iloc[i]['matthews_corrcoef'])
+            best_models = pd.concat([best_models, pd.DataFrame(model_data.iloc[i]).T], ignore_index=True)
     
     best_models.drop(['fold'], axis=1)
     return best_models_config, best_weights,  best_models
@@ -271,7 +275,9 @@ if __name__ == '__main__':
         best_models_results.to_csv(os.path.join(LOGS_PATH, 'model_metrics.csv'), index=False)
         print('TOTAL TIME - 5-FOLDS:', (end_total - start_total) / 60, 'minutes')
 
-        models_to_test, weights_models,  ranking = get_best_models_config(best_models_results)
+        models_to_test, weights_models,  ranking = get_best_models_config(best_models_results, config.get('num_best_models', 3))
+        print(len(models_to_test))
+        print(len(weights_models))
         weights_models = np.array(weights_models)
         weights_models /= np.sum(weights_models)
         
@@ -295,6 +301,7 @@ if __name__ == '__main__':
     # select the best model
     ensemble_predictions = pd.DataFrame()
     ensemble_models = []
+    count = 1
     for best_model_name, best_params in models_to_test:
         print('MODEL', best_model_name)
         if type(best_params) is not dict:
@@ -310,10 +317,10 @@ if __name__ == '__main__':
 
         model_predictions = output_predictions.copy()
         model_predictions['Class'] = preds
-        ensemble_predictions[best_model_name] = preds
+        ensemble_predictions[best_model_name + str(count)] = preds
         # save model predictions
-        model_predictions.to_csv(os.path.join(TARGET_PATH, f'{best_model_name}_preds.csv'), index=False)
-    
+        model_predictions.to_csv(os.path.join(TARGET_PATH, f'{best_model_name + str(count)}'), index=False)
+        count += 1
     # ensemble the results
     voting_preds = ensemble_predictions.apply(majority_voting, axis=1, weights=weights_models)
     output_predictions['Class'] = voting_preds
