@@ -88,7 +88,7 @@ def grid_search(model, params, x_train, y_train, model_name, fold):
 
     return grid_search.best_estimator_, df, grid_search.best_params_
 
-def get_best_models_config(data, best_num=3):
+def get_best_models_config(data, best_num=5):
     """ returns the best config for each model tested according to the cross-validation results"""
     compare = data.groupby(['model', 'config']).mean()
     compare['count'] = data.groupby(['model', 'config'])['fold'].count()
@@ -130,6 +130,7 @@ def train_predict_model(save_path, y_test, y_pred, fold, model_name, params, tot
     #reorganize dataframe
     metrics = metrics[['model', 'config', 'fold', 'f1_weighthed','matthews_corrcoef', 'balanced_accuracy','precision_weighthed','recall_weighthed','time(minutes)']]
     return metrics
+
 # main funtion of python
 if __name__ == '__main__':
     # get experience from logs folder
