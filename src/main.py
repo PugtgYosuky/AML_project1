@@ -107,16 +107,15 @@ def get_best_models_config(data, best_num=5):
 
     best_models = pd.DataFrame()
     for model in compare.model.unique():
-        if model == 'MajorityVoting':
-            continue
         model_data = compare.loc[compare.model == model]
         model_data = model_data.sort_values(by=['matthews_corrcoef', 'f1_weighted'], ascending=False)
         num_samples = len(model_data)
-        num_samples = min(num_samples, best_num) # save the best three models of each type
+        num_samples = min(num_samples, best_num) # save the best models of each type
         for i in range(num_samples):
-            best_models_config.append([model_data.iloc[i]['model'], model_data.iloc[i]['config']])
-            best_weights.append(model_data.iloc[i]['matthews_corrcoef'])
             best_models = pd.concat([best_models, pd.DataFrame(model_data.iloc[i]).T], ignore_index=True)
+            if model != 'MajorityVoting':
+              best_models_config.append([model_data.iloc[i]['model'], model_data.iloc[i]['config']])
+              best_weights.append(model_data.iloc[i]['matthews_corrcoef'])
     
     best_models.drop(['fold'], axis=1)
     return best_models_config, best_weights,  best_models
@@ -251,13 +250,11 @@ if __name__ == '__main__':
                 # for train, test in KFOLD
                 # sees which model to use and the model´s parameters
                 start = time.time()
-                ensemble_models = []
                 models_weights = []
                 ensemble_predictions = pd.DataFrame()
                 for model_name, params in models_to_test:
                     model = instanciate_model(model_name, params)
                     # add the instanciated model to the list for ensemble
-                    ensemble_models.append((model_name, instanciate_model(model_name, params)))
                     # metrics = train_predict_model(model, PREDICTIONS_PATH, x_train, y_train, x_test, y_test, fold, model_name, params)
                     print('MODEL:', model_name)
                     start_model = time.time()
@@ -281,9 +278,9 @@ if __name__ == '__main__':
                 print(f'\n[{fold+1}-fold] Time to test all models: ', (end-start)/60, 'minutes')
 
 
-                best_models_results.to_csv(os.path.join(LOGS_PATH, 'model_metrics.csv'), index=False)
+            best_models_results.to_csv(os.path.join(LOGS_PATH, 'model_metrics.csv'), index=False)
 
-                models_to_test, weights_models,  ranking = get_best_models_config(best_models_results, config.get('num_best_models', 3))
+            models_to_test, weights_models,  ranking = get_best_models_config(best_models_results, config.get('num_best_models', 3))
                 
 
         weights_models = np.array(weights_models)
@@ -313,7 +310,6 @@ if __name__ == '__main__':
 
     # select the best model
     ensemble_predictions = pd.DataFrame()
-    ensemble_models = []
     count = 1
     for best_model_name, best_params in models_to_test:
         print('MODEL', best_model_name)
@@ -321,7 +317,6 @@ if __name__ == '__main__':
             best_params = json.loads(best_params)
 
         best_model = instanciate_model(best_model_name, best_params)
-        ensemble_models.append((best_model_name, instanciate_model(best_model_name, best_params)))
         # fit best model
         best_model.fit(X_transformed, y_transformed)
         
