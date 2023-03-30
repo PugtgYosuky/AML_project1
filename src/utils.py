@@ -93,8 +93,8 @@ def calculate_metrics (y_test, y_pred):
     return {
           'balanced_accuracy' : metrics.balanced_accuracy_score(y_test, y_pred),
         #   'roc_auc_score' : metrics.roc_auc_score(y_test, y_pred),
-          'recall_weighthed' : metrics.recall_score(y_test, y_pred, average='weighted'), 
-          'f1_weighthed' : metrics.f1_score(y_test, y_pred, average='weighted'), 
-          'precision_weighthed' : metrics.precision_score(y_test, y_pred, average='weighted'), 
+          'recall_weighted' : metrics.recall_score(y_test, y_pred, average='weighted'), 
+          'f1_weighted' : metrics.f1_score(y_test, y_pred, average='weighted'), 
+          'precision_weighted' : metrics.precision_score(y_test, y_pred, average='weighted'), 
           'matthews_corrcoef' : metrics.matthews_corrcoef(y_test, y_pred)
     }
