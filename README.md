@@ -109,6 +109,15 @@ It shold be given to the program a json file with the following parameters:
 </tr>
 
 <tr>
+    <td> num_best_models </td>
+    <td> Number of best models of each type that shoulb be selected wo predict the test dataset</td>
+    <td> - </td>
+    <td> 3 </td>
+    <td> No </td>
+    <td> integer </td>
+</tr>
+
+<tr>
     <td> models_names </td>
     <td> List with the models and parameters to use for each model. In case of grid search, each parameter should be a list with the values to test</td>
     <td> - </td>
@@ -134,5 +143,7 @@ It shold be given to the program a json file with the following parameters:
     <td> No </td>
     <td> boolean </td>
 </tr>
+
+num_best_models
 
 </table>
