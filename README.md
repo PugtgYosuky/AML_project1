@@ -1,6 +1,15 @@
 # AML_project1
 IDS detection
 
+## Files delivered
+### Explore dataset (contains the data analysis))
+- explore_dataset.ipynb
+
+### Run program
+- main.py
+- preprocess_data.py
+- utils.py
+
 ## Packages versions
 ### Python
 - Python: version 3.8.15
