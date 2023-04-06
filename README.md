@@ -144,6 +144,6 @@ It shold be given to the program a json file with the following parameters:
     <td> boolean </td>
 </tr>
 
-num_best_models
+The config.json present an example of a configuration file.
 
 </table>
