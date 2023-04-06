@@ -13,9 +13,14 @@ To run the program, it is highly recommended to use the these versions.
 
 ## RUN program
 
+### Download datasets
+First, you must put the training and test datasets in the directory src/dataset
+The data can be downloaded from https://www.kaggle.com/competitions/aml-2023-projet1/data-
+
 To install the recommended, the following command should be run in the terminal:
 <code> pip install -r requirements.txt </code>
 
+### Command 
 To use the program, the following command should be run in the terminal:
 <code> 
 cd src
