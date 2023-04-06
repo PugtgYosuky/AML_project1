@@ -50,12 +50,13 @@ def majority_voting(results, weights):
 
 
 def grid_search(model, params, x_train, y_train, model_name, kfold):
+    """ Performes grid search to find the best model for the parameters"""
     scoring = {
-        'f1_weighted'           : 'f1_weighted',
-        'balanced_accuracy'     : 'balanced_accuracy',
-        'matthews_corrcoef'     : 'matthews_corrcoef',
-        'recall_weighted'  : 'recall_weighted',
-        'precision_weighted'  : 'precision_weighted',
+        'f1_weighted' : 'f1_weighted',
+        'balanced_accuracy' : 'balanced_accuracy',
+        'matthews_corrcoef' : 'matthews_corrcoef',
+        'recall_weighted' : 'recall_weighted',
+        'precision_weighted' : 'precision_weighted',
 
     }
     start = time.time()
@@ -83,6 +84,7 @@ def grid_search(model, params, x_train, y_train, model_name, kfold):
     
     metrics = ['f1_weighted','matthews_corrcoef','balanced_accuracy','precision_weighted','recall_weighted']
     metrics_names = [f'mean_test_{metric}' for metric in metrics]
+    # saves the results
     results = pd.DataFrame()
     results['model'] = [model.__class__.__name__] * len(cv_results['params'])
     results['config'] = cv_results['params']
@@ -93,7 +95,7 @@ def grid_search(model, params, x_train, y_train, model_name, kfold):
     results['time(minutes)'] = cv_results['mean_fit_time'] + cv_results['mean_score_time']
     results['count'] = 5
     sorted_results = results.sort_values(by=['matthews_corrcoef', 'f1_weighted'], ascending=False)
-    sorted_results = sorted_results.iloc[:min(len(sorted_results), 5)]
+    sorted_results = sorted_results.iloc[:min(len(sorted_results), 5)] # selects up to 5 models (the best ones)
     return sorted_results
 
 def get_best_models_config(data, best_num=5):
@@ -121,6 +123,7 @@ def get_best_models_config(data, best_num=5):
     return best_models_config, best_weights,  best_models
 
 def train_predict_model(save_path, y_test, y_pred, fold, model_name, params, total_time):
+    """ Calculates the metrics of the predictions"""
     predictions = pd.DataFrame()
     predictions['y_test'] = y_test
     predictions['y_pred'] = y_pred
@@ -206,10 +209,11 @@ if __name__ == '__main__':
     use_grid_search = config.get('grid_search', False)
     balance_method = config.get('balance_dataset', None)
 
-    weights_models = [1/len(models_to_test)] * len(models_to_test)
+    weights_models = [1/len(models_to_test)] * len(models_to_test) # default weights for the majority vote
 
     train_only = config.get('train_only', False)
     if not train_only:
+        # uses cross-validation
         kfold = StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
 
         if use_grid_search:
@@ -244,18 +248,14 @@ if __name__ == '__main__':
                 if balance_method:
                     x_train, y_train = dataset_balance(x_train, y_train, balance_method)
 
-                # reads the models from config file
-                
-
                 # for train, test in KFOLD
                 # sees which model to use and the model´s parameters
                 start = time.time()
                 models_weights = []
                 ensemble_predictions = pd.DataFrame()
-                for model_name, params in models_to_test:
+                for model_name, params in models_to_test: # tests each model
                     model = instanciate_model(model_name, params)
                     # add the instanciated model to the list for ensemble
-                    # metrics = train_predict_model(model, PREDICTIONS_PATH, x_train, y_train, x_test, y_test, fold, model_name, params)
                     print('MODEL:', model_name)
                     start_model = time.time()
                     model.fit(x_train, y_train)
@@ -270,6 +270,7 @@ if __name__ == '__main__':
                 models_weights = np.array(models_weights)
                 models_weights /= np.sum(models_weights)
                 print('MODEL:', 'MajorityVoting')
+                # majority voting
                 voting_preds = ensemble_predictions.apply(majority_voting, axis=1, weights=models_weights)
                 metrics = train_predict_model(PREDICTIONS_PATH, y_test, voting_preds, fold, 'MajorityVoting', params, 0)
                 best_models_results = pd.concat([best_models_results, metrics], ignore_index=True)
@@ -311,6 +312,7 @@ if __name__ == '__main__':
     # select the best model
     ensemble_predictions = pd.DataFrame()
     count = 1
+    # train and prediction using the best models
     for best_model_name, best_params in models_to_test:
         print('MODEL', best_model_name)
         if type(best_params) is not dict:

@@ -25,6 +25,7 @@ from xgboost import XGBClassifier
 
 
 def instanciate_model(model_name, settings={}):
+    """ Instanciates the classifier given it's name and settings"""
     if model_name == 'LogisticRegression':
         model = LogisticRegression(**settings, random_state=42)
 
@@ -58,38 +59,8 @@ def instanciate_model(model_name, settings={}):
     return model
 
 
-
-#! After GridSearchCV this function will decide the best model to choose with cross_validate
-def final_selection(X, y, models_list): # ????????????????????????????????????????????????????????
-    scoring = ['f1_weighted' ,'accuracy' ,'balanced_accuracy' ,'matthews_corrcoef' ,'roc_auc_ovr_weighted']
-
-    for model in models_list:
-        # model = instanciate_model(model_name) 
-        cross_val = cross_validate(model, X, y, cv=5, scoring=scoring)
- 
-        aux = cross_val.cv_results_
-        pprint.pprint(aux)
-
-        mean_accuracy = aux['test_accuracy'].mean()
-        mean_precision = aux['test_precision_macro'].mean()
-        mean_recall = aux['test_recall_macro'].mean()
-        mean_f1 = aux['test_f1_macro'].mean()
-        print(f'Model {model}: accuracy={mean_accuracy:.3f}, precision={mean_precision:.3f}, recall={mean_recall:.3f}, f1={mean_f1:.3f}')
-
-#! Function to train the desired model
-def train_model(X_train, y_train, X_test, y_test , modelToTrain):
-        model = modelToTrain()
-        model.fit(X_train, y_train)
-        score = model.score(X_test, y_test)
-        pprint.pprint(score)
-
-#! Function to select the best model based on 'mean_test_f1_weighted' and 'mean_test_matthews_corrcoef'
-def train_model(path):
-        data = pd.read_csv(path)
-        best_model = data.sort_values(by=['mean_test_f1_weighted', 'mean_test_matthews_corrcoef'], ascending=False)
-        print(best_model.iloc[0])
-
 def calculate_metrics (y_test, y_pred):
+    """ calculates the metrics of the predictions """
     return {
           'balanced_accuracy' : metrics.balanced_accuracy_score(y_test, y_pred),
         #   'roc_auc_score' : metrics.roc_auc_score(y_test, y_pred),

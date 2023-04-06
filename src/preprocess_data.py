@@ -21,6 +21,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import VarianceThreshold, SelectKBest
 
 class DropColumns(BaseEstimator):
+    """ Class to drop columns from the dataset"""
     def __init__(self, columns=[], threshold=0.8):
         self.threshold = threshold
         self.columns = columns
@@ -36,6 +37,7 @@ class DropColumns(BaseEstimator):
 
 
 class CustomEncoder(BaseEstimator):
+    """ class to encode the categoracal variables"""
     def __init__(self, cols=None):
         self.cols = cols
 
@@ -59,17 +61,17 @@ class CustomEncoder(BaseEstimator):
 
         return pd.DataFrame(X_encoded, columns=X.columns)
 
-#! Function to balancing de dataset. Receives X ,y , bmodel -> name of the model to use(SMOTE)
-def dataset_balance(X ,y , bmodel):
-    if bmodel == "SMOTE":
+
+def dataset_balance(X ,y , model):
+    if model == "SMOTE":
         smote = SMOTE(random_state=0)
         X_resampled, y_resampled = smote.fit_resample(X, y) 
 
-    elif bmodel == "SMOTETomek":
+    elif model == "SMOTETomek":
         smotetomek = SMOTETomek(random_state=0)
         X_resampled, y_resampled = smotetomek.fit_resample(X, y)
 
-    elif bmodel == "SMOTEENN":
+    elif model == "SMOTEENN":
         smoteenn = SMOTEENN(random_state=0)
         X_resampled, y_resampled = smoteenn.fit_resample(X, y)
 
@@ -77,14 +79,15 @@ def dataset_balance(X ,y , bmodel):
 
 
 def create_fit_pipeline(config, X, y):
+    """ Creates the pipeline and fits the training data"""
     # set parameters
-    nm = config.get('norm_model', 'Standard') # try to get 'norm_model' from config files, uses 'Standart' if not founded
+    norm_model_name = config.get('norm_model', 'Standard') # try to get 'norm_model' from config files, uses 'Standart' if not founded
 
     # select which scaler to use
-    if nm == 'MinMax':
+    if norm_model_name == 'MinMax':
         print('MinMaxScaler')
         norm_model = MinMaxScaler()
-    elif nm == 'Robust':
+    elif   norm_model_name == 'Robust':
         print('RobustScaler')
         norm_model = RobustScaler()
     else:
@@ -95,7 +98,6 @@ def create_fit_pipeline(config, X, y):
     categorical_columns = X.select_dtypes(include='object').columns.tolist() # list the categorical columns
     numerical_columns = [col for col in X if col not in categorical_columns] # list the numerical columns
     drop = DropColumns(config.get('columns_to_drop', []))
-    print(type(drop))
     # pipeline of Preprocessing(Normalization, Feature Selection, Variance Selection, Scaler)
     pipeline = Pipeline(steps=[
         ('categories', ColumnTransformer(
@@ -117,6 +119,7 @@ def create_fit_pipeline(config, X, y):
     return pipeline, X_transformed, y_transformed
     
 def encode_target(y):
+    """ Encode of the target variable"""
     # dict with classes map
     classes_map = {
         'normal' : 0,
