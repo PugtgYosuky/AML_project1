@@ -1,16 +1,50 @@
 {
-    "dataset" : "./dataset/train_students.csv",
-    "target_dataset" : "./dataset/test_students.csv",
-    "norm_model" : "MinMax",
+    "dataset": "./dataset/train_students.csv",
+    "target_dataset": "./dataset/test_students.csv",
+    "norm_model": "MinMax",
     "models_names": [
-        ["RandomForestClassifier" ,{}],
-        ["DecisionTreeClassifier",{}],
-        ["XGBClassifier", {}],
-        ["LGBMClassifier", {}]
+     [
+      "XGBClassifier",
+      {}
+     ],
+     [
+      "XGBClassifier",
+      {
+       "booster": "gbtree",
+       "colsample_bytree": 1.0,
+       "eta": 0.05,
+       "n_estimators": 200,
+       "objective": "multi:softmax",
+       "subsample": 0.8
+      }
+     ],
+     [
+      "RandomForestClassifier",
+      {
+       "bootstrap": true,
+       "class_weight": null,
+       "criterion": "gini",
+       "n_estimators": 200
+      }
+     ]
+    ],
+    "grid_search": false,
+    "ensemble": true,
+    "train_only": false,
+    "variance_threshold" : 0.01,
+    "number_best_features" : 30,
+    "balance_dataset" : "SMOTETomek",
+    "num_best_models" : 3,
+
+    "columns_to_drop": [
+     "num_root",
+     "srv_serror_rate",
+     "srv_rerror_rate",
+     "dst_host_srv_serror_rate",
+     "dst_host_serror_rate",
+     "dst_host_rerror_rate",
+     "dst_host_srv_rerror_rate",
+     "dst_host_same_srv_rate",
+     "service"
     ]
-    ,
-    "grid_search" : false,
-    "ensemble" : true,
-    "train_only" : false,
-    "columns_to_drop" : ["dst_host_count", "num_root"]
-}
+   }
